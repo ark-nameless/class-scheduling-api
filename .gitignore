@@ -1,5 +1,5 @@
 .venv-supafastapi
 .deta 
-
+__pycache__
 
 .env
