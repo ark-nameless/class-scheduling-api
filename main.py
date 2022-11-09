@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_jwt_auth.exceptions import AuthJWTException
 from core.config import settings
+import core.oauth
 
 from api import base
 
@@ -14,9 +15,9 @@ app = FastAPI(title=settings.PROJECT_NAME, version=settings.PROJECT_VERSION)
 
 origins = [
     '*',
-    # "http://localhost",
+    "http://localhost",
     # "http://localhost:8000",
-    # "http://loclahost:4200",
+    "http://localhost:4201",
 ]
 app.add_middleware(
     CORSMiddleware,
