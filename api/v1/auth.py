@@ -68,3 +68,21 @@ async def login(user: LoginUser, Authorize: AuthJWT = Depends()):
 				} 
 		   }
 
+
+@router.get('/verify-token/{tokenId}')
+async def check_verify_account_token(tokenId: str, Authorize: AuthJWT = Depends()):
+	try: 
+		token = db.supabase.table('users').select('token').eq('token', tokenId).execute()
+		print(len(token.data))
+		if not bool(token.data):
+			raise HTTPException(
+				status_code=status.HTTP_404_NOT_FOUND,
+				detail="Verification token does not exists"
+			)
+	except APIError as e: 
+		raise HTTPException(
+			status_code=status.HTTP_404_NOT_FOUND,
+			detail="Verification token does not exists"
+		)
+
+	return { 'status': True }

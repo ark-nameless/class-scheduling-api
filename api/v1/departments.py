@@ -24,7 +24,7 @@ router = APIRouter()
     '',
 )
 async def get_all_departments(Authorize: AuthJWT = Depends()):
-    Authorize.jwt_optional()
+    Authorize.jwt_required()
     user_request = Authorize.get_jwt_subject() or "anonymous"
 
     departments = db.supabase.table('departments').select('*').execute()
@@ -48,7 +48,7 @@ async def get_all_departments(Authorize: AuthJWT = Depends()):
     '/heads',
 )
 async def get_all_department_heads(Authorize: AuthJWT = Depends()):
-    Authorize.jwt_optional()
+    Authorize.jwt_required()
     user_request = Authorize.get_jwt_subject() or "anonymous"
 
     department_heads = db.supabase.rpc('get_department_heads', {}).execute()
@@ -73,7 +73,7 @@ async def get_all_department_heads(Authorize: AuthJWT = Depends()):
     '/{departmentId}/teachers',
 )
 async def get_all_teachers_in_department(departmentId: str, Authorize: AuthJWT = Depends()):
-    Authorize.jwt_optional()
+    Authorize.jwt_required()
     user_request = Authorize.get_jwt_subject() or 'anonymous'
 
     data = []
@@ -102,7 +102,7 @@ async def get_all_teachers_in_department(departmentId: str, Authorize: AuthJWT =
     '/{departmentId}/students',
 )
 async def get_all_students_in_department(departmentId: str, Authorize: AuthJWT = Depends()):
-    Authorize.jwt_optional()
+    Authorize.jwt_required()
     user_request = Authorize.get_jwt_subject() or 'anonymous'
 
     data = []
@@ -141,7 +141,7 @@ async def get_all_classes_in_department(departmentId: str, Authorize: AuthJWT = 
     '/',
 )
 async def create_new_department(payload: CreateDepartment, Authorize: AuthJWT = Depends()):
-    Authorize.jwt_optional()
+    Authorize.jwt_required()
     user_request = Authorize.get_jwt_subject() or "anonymous"
 
     try: 
@@ -179,7 +179,7 @@ async def create_new_department(payload: CreateDepartment, Authorize: AuthJWT = 
     '/{departmentId}',
 )
 async def update_department(departmentId: str, payload: UpdateDepartment, Authorize: AuthJWT = Depends()): 
-    Authorize.jwt_optional()
+    Authorize.jwt_required()
     user_request = Authorize.get_jwt_subject() or "anonymous"
 
     try: 
@@ -215,7 +215,7 @@ async def update_department(departmentId: str, payload: UpdateDepartment, Author
     '/{departmentId}',
 )
 async def remove_department(departmentId: str, Authorize: AuthJWT = Depends()):
-    Authorize.jwt_optional()
+    Authorize.jwt_required()
     user_request = Authorize.get_jwt_subject() or "anonymous"
 
     try: 
