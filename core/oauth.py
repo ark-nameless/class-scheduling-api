@@ -14,7 +14,7 @@ class Setting(BaseModel):
     authjwt_algorithm: str = 'RS256'
     authjwt_public_key: str = public_key
     authjwt_private_key: str = private_key
-    authjwt_access_token_expires: int = 60
+    authjwt_access_token_expires: int = 60 * 60 * 24
 
 @AuthJWT.load_config
 def get_config():

@@ -24,4 +24,9 @@ class Settings:
     ALGORITHM = "HS256"                         
     ACCESS_TOKEN_EXPIRE_MINUTES = 30  
 
+    MAILER_PORT: int = os.getenv("MAILER_PORT")
+    MAILER_DOMAIN: str = os.getenv("MAILER_DOMAIN")
+    MAILER_USERNAME: str = os.getenv("MAILER_USERNAME")
+    MAILER_PASSWORD: str = os.getenv("MAILER_PASSWORD")
+
 settings = Settings()
