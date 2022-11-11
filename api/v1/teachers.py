@@ -8,7 +8,6 @@ from fastapi_jwt_auth import AuthJWT
 
 from postgrest.exceptions import APIError
 
-from sqlmodel import Session, select
 from db.db import db
 from core.uuid_slug import ID
 

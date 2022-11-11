@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_jwt_auth import AuthJWT
 
-from sqlmodel import Session, select
 
 from postgrest.exceptions import APIError
 
