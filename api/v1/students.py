@@ -166,16 +166,15 @@ async def add_unverified_student(payload: NewUnverifiedStudent, Authorize: AuthJ
     Authorize.jwt_optional()
     user_request = Authorize.get_jwt_subject() or "anonymous"
 
+    email_exist = db.supabase.table('users').select('email').eq('email', payload.email).execute()
+    if len(email_exist.data) > 0: 
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User with the same email already exists"
+        )
 
     data = {}
     try:
-        email_exist = db.supabase.table('users').select('email').eq('email', payload.email).execute()
-        if len(email_exist.data) > 0: 
-            return HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="User with the same email already exists"
-            )
-        
         department_id = ID.slug2uuid(payload.department_id)
         user = db.supabase.table('users').insert({'email': payload.email, 'token': secrets.token_urlsafe(), 'role': 'Student'}).execute()
         student = db.supabase.table('students').insert({'user_id': user.data[0]['id'], 'department_id': department_id}).execute()
@@ -186,6 +185,11 @@ async def add_unverified_student(payload: NewUnverifiedStudent, Authorize: AuthJ
         student_data = student.data[0]
         student_data['department_id'] = department_id
 
+        department = db.supabase.table('departments').select('*').eq('id', department_id).execute()
+        department_data = {
+            'department_name': department.data[0]['name'],
+            'abbrev': department.data[0]['abbrev'],
+        }
 
     except APIError as e:
         raise HTTPException(
@@ -198,7 +202,7 @@ async def add_unverified_student(payload: NewUnverifiedStudent, Authorize: AuthJ
             detail=e
         )
 
-    return { 'data': {**user_data, **student_data}, 'request_by': user_request, 'when': datetime.utcnow() }
+    return { 'data': {**user_data, **student_data, **department_data}, 'request_by': user_request, 'when': datetime.utcnow() }
 
 
     pass

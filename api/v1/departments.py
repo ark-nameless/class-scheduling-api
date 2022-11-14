@@ -137,12 +137,11 @@ async def get_all_classes_in_department(departmentId: str, Authorize: AuthJWT = 
 # ================= POST REQUESTS =================
 
 @router.post(
-    '/',
+    '',
 )
 async def create_new_department(payload: CreateDepartment, Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
     user_request = Authorize.get_jwt_subject() or "anonymous"
-
     try: 
         dept_abbrev = db.supabase.table('departments').select('abbrev').eq('abbrev', payload.abbrev).execute()
         if dept_abbrev.data: 
@@ -158,19 +157,21 @@ async def create_new_department(payload: CreateDepartment, Authorize: AuthJWT = 
                 detail="Department section id already exists."
             )
 
+        payload.head_id = ID.slug2uuid(payload.head_id)
         new_department = db.supabase.table('departments').insert({ **payload.dict() }).execute()
+        if payload.head_id != None:
+            print('change user info')
+            update_user_department = db.supabase.table('teachers').update({'department_id': new_department.data[0]['id']}).eq('user_id', payload.head_id).execute()
+            update_user_role = db.supabase.table('users').update({'role': 'Department Head'}).eq('id', payload.head_id).execute()
+
+        new_department.data[0]['id'] = ID.uuid2slug(str(new_department.data[0]['id']))
     except APIError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail= e.message
         )
-    # except Exception as e: 
-    #     raise HTTPException(
-    #         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-    #         detail= e.message or e.detail
-    #     )
 
-    return { **new_department.dict(), 'when': datetime.utcnow(), 'request_by': user_request }
+    return { **new_department.data[0], 'when': datetime.utcnow(), 'request_by': user_request }
 
 # ================= PUT REQUESTS =================
 

@@ -1,7 +1,9 @@
 .venv-supafastapi
 .deta 
 __pycache__
+venv
 
 .env
 *.pem
 *.key
+.vercel

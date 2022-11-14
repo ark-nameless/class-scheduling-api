@@ -35,3 +35,4 @@ def authjwt_exception_handler(request: Request, exc: AuthJWTException):
 )
 
 app.include_router(base.api_router)
+

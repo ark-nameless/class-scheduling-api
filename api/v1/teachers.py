@@ -11,7 +11,7 @@ from postgrest.exceptions import APIError
 from db.db import db
 from core.uuid_slug import ID
 
-from schemas.students import NewUnverifiedStudent
+from schemas.teachers import NewUnverifiedTeacher
 
 
 
@@ -29,16 +29,21 @@ async def get_all_teachers(Authorize: AuthJWT = Depends()):
 
     data = []
     try:
-        teachers = db.supabase.rpc('get_all_students', {}).execute()
+        teachers = db.supabase.rpc('get_all_teachers', {}).execute()
         
-        for entry in students.data: 
+        for entry in teachers.data: 
             data.append({
                 "id": ID.uuid2slug(entry["id"]),
-                "username": entry["username"],
-                "email": entry["email"],
+                "username": entry["username"] or '',
+                "email": entry["email"] or '',
+                "role": entry["role"],
+                "verified": entry['verified'],
                 "name": entry["name"],
                 "department_id": ID.uuid2slug(entry["department_id"]),
-                "role": entry["role"],
+                "profile_img": entry['profile_img']  or '',
+                "address": entry['address']  or '',
+                "department_name": entry['department_name'],
+                "abbrev": entry['abbrev']
             })
     except APIError as e:
         raise HTTPException(
@@ -55,89 +60,30 @@ async def get_all_teachers(Authorize: AuthJWT = Depends()):
 
 
 @router.get(
-    '/verified',
+    '/none-department-head',
 )
-async def get_all_verified_students(Authorize: AuthJWT = Depends()):
+async def get_all_none_department_head_teachers(Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
     user_request = Authorize.get_jwt_subject() or "anonymous"
 
     data = []
     try:
-        students = db.supabase.rpc('get_students', {'is_verified': True}).execute()
-
-        for entry in students.data: 
-            data.append({
-                "id": ID.uuid2slug(entry["id"]),
-                "username": entry["username"],
-                "email": entry["email"],
-                "name": entry["name"],
-                "department_id": ID.uuid2slug(entry["department_id"]),
-                "role": entry["role"],
-            })
-    except APIError as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=e.message
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=e
-        )
-
-    return { 'data': data, 'request_by': user_request, 'when': datetime.utcnow() }
-
-
-@router.get(
-    '/unverified',
-)
-async def get_all_unverified_students(Authorize: AuthJWT = Depends()):
-    Authorize.jwt_optional()
-    user_request = Authorize.get_jwt_subject() or "anonymous"
-
-    data = []
-    try:
-        students = db.supabase.rpc('get_students', {'is_verified': False}).execute()
-
-        for entry in students.data: 
-            data.append({
-                "id": ID.uuid2slug(entry["id"]),
-                "username": entry["username"],
-                "email": entry["email"],
-                "name": entry["name"],
-                "department_id": ID.uuid2slug(entry["department_id"]),
-                "role": entry["role"],
-            })
-    except APIError as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=e.message
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=e
-        )
-
-    return { 'data': data, 'request_by': user_request, 'when': datetime.utcnow() }
-
-
-@router.get(
-    '/{id}',
-)
-async def get_student_profile(id: str, Authorize: AuthJWT = Depends()):
-    Authorize.jwt_optional()
-    user_request = Authorize.get_jwt_subject() or "anonymous"
-
-    data = {}
-    try:
-        id = ID.slug2uuid(id)
-        student = db.supabase.rpc('get_student_profile', {'id': id}).execute()
+        teachers = db.supabase.rpc('get_not_dept_head_teachers', {}).execute()
         
-        data = student.data[0]
-
-        data['id'] = ID.uuid2slug(data['id'])
-        data['department_id'] = ID.uuid2slug(data['department_id'])
+        for entry in teachers.data: 
+            data.append({
+                "id": ID.uuid2slug(entry["id"]),
+                "username": entry["username"] or '',
+                "email": entry["email"] or '',
+                "role": entry["role"],
+                "verified": entry['verified'],
+                "name": entry["name"],
+                "department_id": ID.uuid2slug(entry["department_id"]),
+                "profile_img": entry['profile_img']  or '',
+                "address": entry['address']  or '',
+                "department_name": entry['department_name'],
+                "abbrev": entry['abbrev']
+            })
     except APIError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -150,6 +96,8 @@ async def get_student_profile(id: str, Authorize: AuthJWT = Depends()):
         )
 
     return { 'data': data, 'request_by': user_request, 'when': datetime.utcnow() }
+
+
 
 
 # ================= POST REQUESTS =================
@@ -157,23 +105,22 @@ async def get_student_profile(id: str, Authorize: AuthJWT = Depends()):
 @router.post(
     '',
 )
-async def add_unverified_student(payload: NewUnverifiedStudent, Authorize: AuthJWT = Depends()):
+async def register_unverified_teacher(payload: NewUnverifiedTeacher, Authorize: AuthJWT = Depends()):
     Authorize.jwt_optional()
     user_request = Authorize.get_jwt_subject() or "anonymous"
 
+    email_exist = db.supabase.table('users').select('email').eq('email', payload.email).execute()
+    if len(email_exist.data) > 0: 
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User with the same email already exists"
+        )
 
     data = {}
     try:
-        email_exist = db.supabase.table('users').select('email').eq('email', payload.email).execute()
-        if len(email_exist.data) > 0: 
-            return HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="User with the same email already exists"
-            )
-        
         department_id = ID.slug2uuid(payload.department_id)
-        user = db.supabase.table('users').insert({'email': payload.email, 'token': secrets.token_urlsafe(), 'role': 'Student'}).execute()
-        student = db.supabase.table('students').insert({'user_id': user.data[0]['id'], 'department_id': department_id}).execute()
+        user = db.supabase.table('users').insert({'email': payload.email, 'token': secrets.token_urlsafe(), 'role': 'Teacher'}).execute()
+        student = db.supabase.table('teachers').insert({'user_id': user.data[0]['id'], 'department_id': department_id}).execute()
 
         user_data = user.data[0]
         user_data['id'] = ID.uuid2slug(str(user_data['id']))
@@ -181,7 +128,11 @@ async def add_unverified_student(payload: NewUnverifiedStudent, Authorize: AuthJ
         student_data = student.data[0]
         student_data['department_id'] = department_id
 
-
+        department = db.supabase.table('departments').select('*').eq('id', department_id).execute()
+        department_data = {
+            'department_name': department.data[0]['name'],
+            'abbrev': department.data[0]['abbrev'],
+        }
     except APIError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -193,10 +144,8 @@ async def add_unverified_student(payload: NewUnverifiedStudent, Authorize: AuthJ
             detail=e
         )
 
-    return { 'data': {**user_data, **student_data}, 'request_by': user_request, 'when': datetime.utcnow() }
+    return { 'data': {**user_data, **student_data, **department_data}, 'request_by': user_request, 'when': datetime.utcnow() }
 
-
-    pass
 
 # ================= PUT REQUESTS =================
 

@@ -9,6 +9,7 @@ load_dotenv(dotenv_path=env_path)
 class Settings:
     PROJECT_NAME: str = os.getenv("PROJECT_NAME")
     PROJECT_VERSION: str = os.getenv("PROJECT_VERSION")
+    FRONTEND_URL: str = os.getenv('FRONTEND_URL')
 
     POSTGRES_USER : str = os.getenv("POSTGRES_USER")
     POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")

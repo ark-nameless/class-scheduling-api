@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_jwt_auth import AuthJWT
 
@@ -5,13 +7,19 @@ from fastapi_jwt_auth import AuthJWT
 from postgrest.exceptions import APIError
 
 from db.db import db
-from schemas.users import LoginUser
+from schemas.users import LoginUser, AuthVerification
 from core.authentication import Authenticator
 from core.uuid_slug import ID
+
+from core.mailer import Mailer
 
 
 
 router = APIRouter() 
+
+@router.get('/')
+def home():
+	return { 'Hello': 'World' }
 
 @router.get("/user")
 async def user(Authorize: AuthJWT = Depends()):
@@ -31,7 +39,6 @@ async def refresh(Authorize: AuthJWT = Depends()):
 	new_access_token = Authorize.create_access_token(subject=current_user, user_claims=other_claims)
 
 	return { 'access_token': new_access_token }
-
 
 
 @router.post('/login')
@@ -85,3 +92,38 @@ async def check_verify_account_token(tokenId: str, Authorize: AuthJWT = Depends(
 		)
 
 	return { 'status': True }
+
+
+@router.post('/email/reset-password')
+async def send_email_for_password_reset(payload): 
+	mailer = Mailer()
+
+	mailer.send_password_reset(payload.email, payload.token)
+
+	return { 'status': 200 }
+
+
+
+@router.post('/email/verify-account')
+async def send_email_for_verify_account(payload: AuthVerification): 
+	id = ID.slug2uuid(payload.id)
+	try: 
+		user = db.supabase.table('users').select('token', 'email').eq('id', uuid.UUID(id).hex).execute()
+	except: 
+		raise HTTPException(
+			status_code=status.HTTP_400_BAD_REQUEST,
+			detail="Invalid user id"
+		)
+	if len(user.data) < 1: 
+		raise HTTPException(
+			status_code=status.HTTP_404_NOT_FOUND,
+			detail="User id not found"
+		)
+
+	data = user.data[0]
+
+	mailer = Mailer()
+
+	mailer.send_account_verification(data['email'], data['token'])
+
+	return { 'status': 200, 'detail': 'Email verification successfully sent.' }
