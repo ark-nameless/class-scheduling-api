@@ -21,6 +21,10 @@ router = APIRouter()
 def home():
 	return { 'Hello': 'World' }
 
+@router.get('/heath')
+def heath_check():
+	return {status.HTTP_200_OK}
+
 @router.get("/user")
 async def user(Authorize: AuthJWT = Depends()):
 	Authorize.jwt_required()
