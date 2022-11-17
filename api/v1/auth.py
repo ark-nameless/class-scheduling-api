@@ -94,12 +94,20 @@ async def check_verify_account_token(tokenId: str, Authorize: AuthJWT = Depends(
 	return { 'status': True }
 
 
+@router.get('/{userId}/department')
+async def get_department_of_user(userId: str):
+	print(userId)
+	userId = ID.slug2uuid(userId)
+	id = db.supabase.table('teachers').select('departments:department_id(id)').eq('user_id', uuid.UUID(userId).hex).execute()
+	
+	return { 'data': ID.uuid2slug(str(id.data[0]['departments']['id'])) }
+
+
 @router.post('/email/reset-password')
 async def send_email_for_password_reset(payload): 
 	mailer = Mailer()
 
 	mailer.send_password_reset(payload.email, payload.token)
-
 	return { 'status': 200 }
 
 

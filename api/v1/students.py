@@ -3,15 +3,16 @@ import json
 import uuid
 import secrets 
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi_jwt_auth import AuthJWT
 
 from postgrest.exceptions import APIError
 
 from db.db import db
 from core.uuid_slug import ID
+from core.authentication import Authenticator
 
-from schemas.students import NewUnverifiedStudent
+from schemas.students import NewUnverifiedStudent, VerifyStudentAccount
 
 
 
@@ -210,13 +211,35 @@ async def add_unverified_student(payload: NewUnverifiedStudent, Authorize: AuthJ
 # ================= PUT REQUESTS =================
 
 @router.put(
-    '/{departmentId}',
+    '/{tokenId}',
 )
-async def update_department(departmentId: str, payload, Authorize: AuthJWT = Depends()): 
-    Authorize.jwt_required()
-    user_request = Authorize.get_jwt_subject() or "anonymous"
+async def verify_student_information(tokenId: str, payload: VerifyStudentAccount): 
+    print(payload)
+    username = db.supabase.table('users').select('username').eq('username', payload.user.username).execute().data
+    if len(username) > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Username already exists"
+        )
 
-    pass
+    try: 
+        user_update = { 
+            'username': payload.user.username,
+            'password': Authenticator.hash_password(payload.user.password),
+            'token': '',
+            'verified': True,
+            'updated_at': str(datetime.utcnow())
+        }
+        student_update = {**payload.student.dict()}
+        update_user = db.supabase.table('users').update(user_update).eq('token', tokenId).execute().data[0]
+        update_student = db.supabase.table('students').update(student_update).eq('user_id', update_user['id']).execute()
+    except Exception as e : 
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=e
+        )
+
+    return { 'data': { 'detail': 'Account Verification Successful'}, 'status': 200 }
 
 
 # ================= PUT REQUESTS =================

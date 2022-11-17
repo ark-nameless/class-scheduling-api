@@ -3,15 +3,16 @@ import json
 import uuid
 import secrets 
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi_jwt_auth import AuthJWT
 
 from postgrest.exceptions import APIError
 
 from db.db import db
 from core.uuid_slug import ID
+from core.authentication import Authenticator
 
-from schemas.teachers import NewUnverifiedTeacher
+from schemas.teachers import NewUnverifiedTeacher, VerifyTeacherAccount
 
 
 
@@ -97,7 +98,29 @@ async def get_all_none_department_head_teachers(Authorize: AuthJWT = Depends()):
 
     return { 'data': data, 'request_by': user_request, 'when': datetime.utcnow() }
 
+    
+@router.get(
+    '/{teacherId}/subject-loads'
+)
+async def get_teachers_active_subject_loads(teacherId: str, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    teacherId = ID.slug2uuid(teacherId)
 
+    data = []
+    try: 
+        schedules = db.supabase.table('active_schedules').select('*').eq('teacher_id', uuid.UUID(teacherId).hex).execute()
+
+        for entry in schedules.data: 
+            entry['id'] = ID.uuid2slug(str(entry['id']))
+            entry['teacher_id'] = ID.uuid2slug(str(entry['teacher_id']))
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Something went wrong, please report to admin the error."
+        )
+
+    return schedules
 
 
 # ================= POST REQUESTS =================
@@ -150,14 +173,34 @@ async def register_unverified_teacher(payload: NewUnverifiedTeacher, Authorize: 
 # ================= PUT REQUESTS =================
 
 @router.put(
-    '/{departmentId}',
+    '/{tokenId}',
 )
-async def update_department(departmentId: str, payload, Authorize: AuthJWT = Depends()): 
-    Authorize.jwt_required()
-    user_request = Authorize.get_jwt_subject() or "anonymous"
+async def verify_teacher_information(tokenId: str, payload: VerifyTeacherAccount): 
+    username = db.supabase.table('users').select('username').eq('username', payload.user.username).execute().data
+    if len(username) > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Username already exists"
+        )
 
-    pass
+    try: 
+        user_update = { 
+            'username': payload.user.username,
+            'password': Authenticator.hash_password(payload.user.password),
+            'token': '',
+            'verified': True,
+            'updated_at': str(datetime.utcnow())
+        }
+        teacher_update = {**payload.teacher.dict()}
+        update_user = db.supabase.table('users').update(user_update).eq('token', tokenId).execute().data[0]
+        update_teacher = db.supabase.table('teachers').update(teacher_update).eq('user_id', update_user['id']).execute()
+    except: 
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Something went wrong"
+        )
 
+    return { 'data': { 'detail': 'Account Verification Successful'}, 'status': 200 }
 
 # ================= PUT REQUESTS =================
 

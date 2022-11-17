@@ -4,6 +4,9 @@ from email.headerregistry import Address
 from email.utils import make_msgid
 from .config import settings
 
+from db.db import db
+
+
 class Mailer:
 
     def __init__(self):
@@ -85,8 +88,17 @@ class Mailer:
 
     
     def send_account_verification(self, email, token): 
+        role = db.supabase.table('users').select('role').eq('token', token).execute()
+        
+        role = role.data[0]['role']
+
+        if (role == 'Department Head' or role == 'Teacher'):
+            role = 'verify-teacher-account'
+        elif (role == 'Student'):
+            role = 'verify-student-account'
+
         msg = EmailMessage()
-        msg['Subject'] = 'MSEUFCI Scheduling Password Reset'
+        msg['Subject'] = 'MSEUFCI Scheduling Account Verification Link'
         msg['From'] = self.sender_mail 
         msg['To'] = email
         msg.set_content(f'''
@@ -115,7 +127,7 @@ class Mailer:
                 <div class="space-y-6 py-8 text-base leading-7 text-gray-600">
                     <p>You've registered for MSEUFCI Class Scheduling System</p>
                     <p>Please follow this link to verify your account</p>
-                    <a href="{self.origin}/verify-account/{token}" class="text-blue-500 hover:text-blue-600">Verify Account &rarr;</a>
+                    <a href="{self.origin}/{role}/{token}" class="text-blue-500 hover:text-blue-600">Verify Account &rarr;</a>
                 </div>
                 <div class="pt-8 text-base font-semibold leading-7">
                     <p class="text-gray-900">Login to website</p>
