@@ -11,9 +11,9 @@ public_key = open('public_key.key').read()
 
 class Setting(BaseModel):
     authjwt_secret_key: str = settings.SECRET_KEY
-    authjwt_algorithm: str = 'RS256'
-    authjwt_public_key: str = public_key
-    authjwt_private_key: str = private_key
+    # authjwt_algorithm: str = 'RS256'
+    # authjwt_public_key: str = public_key
+    # authjwt_private_key: str = private_key
     authjwt_access_token_expires: int = 60 * 60 * 24
 
 @AuthJWT.load_config
