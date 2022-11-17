@@ -10,6 +10,12 @@ from api.v1 import classes
 
 api_router = APIRouter()
 
+@api_router.get(
+    '/'
+)
+def root(): 
+    return { 'Hello': 'World' }
+
 api_router.include_router(test.router, prefix='/test', tags=['Test Routes'])
 api_router.include_router(auth.router, prefix='/auth', tags=['Authentication and Authorization'])
 api_router.include_router(departments.router, prefix="/departments", tags=['Department'])
