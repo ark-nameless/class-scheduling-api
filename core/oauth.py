@@ -6,8 +6,8 @@ from pydantic import BaseModel
 
 from core.config import settings
 
-private_key = open('private_key.pem').read()
-public_key = open('public_key.key').read()
+# private_key = open('private_key.pem').read()
+# public_key = open('public_key.key').read()
 
 class Setting(BaseModel):
     authjwt_secret_key: str = settings.SECRET_KEY
