@@ -138,7 +138,7 @@ async def get_student_profile(id: str, Authorize: AuthJWT = Depends()):
     data = {}
     try:
         id = ID.slug2uuid(id)
-        student = db.supabase.rpc('get_student_profile', {'id': id}).execute()
+        student = db.supabase.rpc('get_student_profile', {'search_id': id}).execute()
         
         data = student.data[0]
 
@@ -244,11 +244,3 @@ async def verify_student_information(tokenId: str, payload: VerifyStudentAccount
 
 # ================= PUT REQUESTS =================
 
-@router.delete(
-    '/{departmentId}',
-)
-async def remove_department(departmentId: str, Authorize: AuthJWT = Depends()):
-    Authorize.jwt_required()
-    user_request = Authorize.get_jwt_subject() or "anonymous"
-
-    pass

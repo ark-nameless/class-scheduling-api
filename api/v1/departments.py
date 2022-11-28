@@ -73,28 +73,41 @@ async def get_all_department_heads(Authorize: AuthJWT = Depends()):
 )
 async def get_all_teachers_in_department(departmentId: str, Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
-    user_request = Authorize.get_jwt_subject() or 'anonymous'
+    user_request = Authorize.get_jwt_subject() or "anonymous"
 
     data = []
     try:
         departmentId = ID.slug2uuid(departmentId)
-        department_teachers = db.supabase.rpc('get_department_teachers', {'search_id': uuid.UUID(departmentId).hex }).execute()
-
-        for entry in department_teachers.data: 
+        teachers = db.supabase.rpc('get_department_teachers', { 'search_id': uuid.UUID(departmentId).hex }).execute()
+        print(departmentId)
+        
+        for entry in teachers.data: 
             data.append({
                 "id": ID.uuid2slug(entry["id"]),
-                "username": entry["username"],
-                "email": entry["email"],
+                "username": entry["username"] or '',
+                "email": entry["email"] or '',
                 "role": entry["role"],
-                "name": entry['name']
+                "verified": entry['verified'],
+                "name": entry["name"],
+                "department_id": ID.uuid2slug(entry["department_id"]),
+                "profile_img": entry['profile_img']  or '',
+                "address": entry['address']  or '',
+                "department_name": entry['department_name'],
+                "abbrev": entry['abbrev']
             })
+    except APIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=e.message
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=e.hint or e.detail
+            detail=e
         )
 
-    return { 'data': data, 'when': datetime.utcnow(), 'request_by': user_request }
+    return { 'data': data, 'request_by': user_request, 'when': datetime.utcnow() }
+
 
 
 @router.get(
@@ -102,37 +115,158 @@ async def get_all_teachers_in_department(departmentId: str, Authorize: AuthJWT =
 )
 async def get_all_students_in_department(departmentId: str, Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
-    user_request = Authorize.get_jwt_subject() or 'anonymous'
+    user_request = Authorize.get_jwt_subject() or "anonymous"
 
     data = []
     try:
         departmentId = ID.slug2uuid(departmentId)
-        department_students = db.supabase.rpc('get_department_students', {'search_id': uuid.UUID(departmentId).hex }).execute()
-
-        for entry in department_students.data: 
+        students = db.supabase.rpc('get_department_students', {'search_id': uuid.UUID(departmentId).hex }).execute()
+        
+        for entry in students.data: 
             data.append({
                 "id": ID.uuid2slug(entry["id"]),
-                "username": entry["username"],
-                "email": entry["email"],
+                "username": entry["username"] or '',
+                "email": entry["email"] or '',
                 "role": entry["role"],
-                "name": entry['name']
+                "verified": entry['verified'],
+                "name": entry["name"],
+                "department_id": ID.uuid2slug(entry["department_id"]),
+                "profile_img": entry['profile_img']  or '',
+                "address": entry['address']  or '',
+                "department_name": entry['department_name'],
+                "abbrev": entry['abbrev']
             })
-    except Exception as e:
+    except APIError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=e.hint or e.detail
+            detail=e.message
+        )
+    except Exception as e:
+        raise HTTPException(
+             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+             detail=e.hint or e.detail
+        )
+
+    return { 'data': data, 'request_by': user_request, 'when': datetime.utcnow() }
+
+
+@router.get(
+    '/{departmentId}/classes',
+)
+async def get_all_classes_in_department(departmentId: str, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    user_request = Authorize.get_jwt_subject() or "anonymous"
+
+    departmentId = ID.slug2uuid(departmentId)
+    classes = db.supabase.table('classes').select('*').eq('department_id', uuid.UUID(departmentId).hex).execute()
+
+
+    data = []
+
+    for entry in classes.data:
+        data.append({
+            "id": ID.uuid2slug(str(entry['id'])),
+            "department_id": ID.uuid2slug(str(entry['department_id'])),
+            "major": entry['major'],
+            "semester": entry['semester'],
+            "year": entry['year'],
+            "subject_loads": list(map(lambda load: ID.uuid2slug(str(load)),entry['subject_loads'])),
+            "students": entry['students'],
+            "name": entry['name']
+        })
+
+    return { 'data': data, 'when': datetime.utcnow(), 'request_by': user_request }
+
+
+
+@router.get(
+    '/{departmentId}/subject-requests',
+)
+async def get_all_subject_requests_in_department(departmentId: str, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    user_request = Authorize.get_jwt_subject() or "anonymous"
+
+    departmentId = ID.slug2uuid(departmentId)
+    classes = db.supabase.table('subject_requests').select('*').eq('to', uuid.UUID(departmentId).hex).execute()
+
+
+    data = []
+
+    try: 
+        for entry in classes.data:
+            department_name = db.supabase.table('departments').select('name').eq('id', uuid.UUID(entry['from'])).execute()
+            data.append({
+                "id": ID.uuid2slug(str(entry['id'])),
+                "from_id": ID.uuid2slug(str(entry['from'])),
+                "from": department_name.data[0]['name'],
+                "to": ID.uuid2slug(str(entry['to'])),
+                "description": entry['description'],
+                "subjects": entry['subjects'],
+            })
+
+
+    except APIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail= e.message
+        )
+    except Exception as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
         )
 
     return { 'data': data, 'when': datetime.utcnow(), 'request_by': user_request }
 
 
-# TODO Implement Classes
 @router.get(
-    '/{departmentId}/classes',
+    '/{departmentId}/subject-requests-responses',
 )
-async def get_all_classes_in_department(departmentId: str, Authorize: AuthJWT = Depends()):
+async def get_all_subject_requests_reponses_in_department(departmentId: str, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    user_request = Authorize.get_jwt_subject() or "anonymous"
 
-    pass
+    departmentId = ID.slug2uuid(departmentId)
+    classes = db.supabase.table('response_schedules').select('*').eq('department_id', uuid.UUID(departmentId).hex).execute()
+
+
+    data = []
+
+    try: 
+        for entry in classes.data:
+            teacher = db.supabase.table('teachers').select('*').eq('user_id', uuid.UUID(entry['teacher_id']).hex).execute()
+            name = teacher.data[0]['name']
+            name = f"{name['lastname']}, {name['firstname']} {name['middlename'][0]}"
+            data.append({
+                "id": ID.uuid2slug(str(entry['id'])),
+                "teacher_id": ID.uuid2slug(str(entry['teacher_id'])),
+                "section_id": entry['section_id'],
+                "subject_id": entry['subject_id'],
+                "description": entry['description'],
+                "units": entry['units'],
+                "hours": entry['hours'],
+                "schedules": entry['schedules'],
+                'teacher_name': name
+            })
+
+
+    except APIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail= e.message
+        )
+    except Exception as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+    return { 'data': data, 'when': datetime.utcnow(), 'request_by': user_request }
+    
+
+
+
+
 
 # ================= POST REQUESTS =================
 
@@ -209,7 +343,7 @@ async def update_department(departmentId: str, payload: UpdateDepartment, Author
     return { **department.dict(), 'when': datetime.utcnow(), 'request_by': user_request }
 
 
-# ================= PUT REQUESTS =================
+# ================= DELETE REQUESTS =================
 
 @router.delete(
     '/{departmentId}',
@@ -228,3 +362,26 @@ async def remove_department(departmentId: str, Authorize: AuthJWT = Depends()):
         )
 
     return { **department.dict(), 'when': datetime.utcnow(), 'request_by': user_request }
+
+@router.delete(
+    '/{requestId}/finish-request',
+)
+async def remove_department(requestId: str, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+
+    try: 
+        requestId = ID.slug2uuid(requestId)
+        request = db.supabase.table('subject_requests').delete().eq('id', uuid.UUID(requestId).hex).execute()
+
+    except APIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail= e.message
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail= str(e)
+        )
+
+    return { 'status': 200, 'detail': 'Successfully Finished!'}

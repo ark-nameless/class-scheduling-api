@@ -113,6 +113,13 @@ async def get_teachers_active_subject_loads(teacherId: str, Authorize: AuthJWT =
         for entry in schedules.data: 
             entry['id'] = ID.uuid2slug(str(entry['id']))
             entry['teacher_id'] = ID.uuid2slug(str(entry['teacher_id']))
+            data.append(entry)
+
+        response_schedules = db.supabase.table('response_schedules').select('*').eq('teacher_id', uuid.UUID(teacherId).hex).execute()
+        for entry in response_schedules.data: 
+            entry['id'] = ID.uuid2slug(str(entry['id']))
+            entry['teacher_id'] = ID.uuid2slug(str(entry['teacher_id']))
+            data.append(entry)
 
     except Exception as e:
         raise HTTPException(
@@ -120,7 +127,37 @@ async def get_teachers_active_subject_loads(teacherId: str, Authorize: AuthJWT =
             detail="Something went wrong, please report to admin the error."
         )
 
-    return schedules
+    return { "data": data }
+
+
+@router.get(
+    '/{id}',
+)
+async def get_teacher_profile(id: str, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_optional()
+    user_request = Authorize.get_jwt_subject() or "anonymous"
+
+    data = {}
+    try:
+        id = ID.slug2uuid(id)
+        student = db.supabase.rpc('get_teacher_profile', {'search_id': id}).execute()
+        
+        data = student.data[0]
+
+        data['id'] = ID.uuid2slug(data['id'])
+        data['department_id'] = ID.uuid2slug(data['department_id'])
+    except APIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=e.message
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=e
+        )
+
+    return { 'data': data, 'request_by': user_request, 'when': datetime.utcnow() }
 
 
 # ================= POST REQUESTS =================
@@ -204,11 +241,3 @@ async def verify_teacher_information(tokenId: str, payload: VerifyTeacherAccount
 
 # ================= PUT REQUESTS =================
 
-@router.delete(
-    '/{departmentId}',
-)
-async def remove_department(departmentId: str, Authorize: AuthJWT = Depends()):
-    Authorize.jwt_required()
-    user_request = Authorize.get_jwt_subject() or "anonymous"
-
-    pass
