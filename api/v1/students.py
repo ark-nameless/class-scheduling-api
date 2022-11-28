@@ -158,6 +158,39 @@ async def get_student_profile(id: str, Authorize: AuthJWT = Depends()):
     return { 'data': data, 'request_by': user_request, 'when': datetime.utcnow() }
 
 
+@router.get(
+    '/{id}/schedules'
+)
+async def get_student_schedules(id: str, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    user_request = Authorize.get_jwt_subject() or "anonymous"
+
+
+    data = []
+    try:
+        id = ID.slug2uuid(id)
+        student = db.supabase.rpc('get_student_schedule', {'search_id': id}).execute()
+        
+        for schedule in student.data: 
+            schedule['id'] = ID.uuid2slug(str(schedule['id']))
+            schedule['teacher_id'] = ID.uuid2slug(str(schedule['teacher_id']))
+
+            data.append(schedule)
+
+    except APIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=e.message
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=e
+        )
+
+    return { 'data': data, 'request_by': user_request, 'when': datetime.utcnow() }
+
+
 # ================= POST REQUESTS =================
 
 @router.post(
