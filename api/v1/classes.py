@@ -30,9 +30,11 @@ async def get_class_info(id: str, Authorize: AuthJWT = Depends()):
         'major': class_info.data[0]['major'],
         'semester': class_info.data[0]['semester'],
         'year': class_info.data[0]['year'],
+        'section_block': class_info.data[0]['section_block'],
     }
 
     return { **data }
+
 
 @router.get(
     '/{id}/class-loads'
@@ -45,6 +47,7 @@ async def get_class_loads(id: str, Authorize: AuthJWT = Depends()):
     class_loads = db.supabase.rpc('get_class_loads', {'search_id': uuid.UUID(str(id)).hex }).execute()
 
     return { 'data': class_loads.data }
+
 
 @router.get(
     '/{id}/class-students'
@@ -61,7 +64,6 @@ async def get_class_students(id: str, Authorize: AuthJWT = Depends()):
         student['name'] = f"{student['name']['lastname'].capitalize()}, {student['name']['firstname'].capitalize()} {student['name']['middlename'].capitalize()[0]}"
 
     return { 'data': class_loads.data }
-
 
 
 @router.get(
@@ -85,6 +87,8 @@ async def get_students_not_in_given_class_id(id: str, Authorize: AuthJWT = Depen
 
 
 
+
+# ======================== POST ========================
 
 @router.post(
     ''
@@ -161,6 +165,7 @@ async def create_new_class_schedule(payload: dict, Authorize: AuthJWT = Depends(
     print(payload)
     return { 'status': 200 }
 
+
 @router.post(
     '/response-schedule'
 )
@@ -197,7 +202,6 @@ async def create_new_response_schedule(payload: dict, Authorize: AuthJWT = Depen
     return { 'status': 200, 'detail': "Successfully Saved!"}
 
 
-
 @router.post(
     '/create-schedule-request'
 )
@@ -228,6 +232,8 @@ async def create_new_schedule_request(payload: dict, Authorize: AuthJWT = Depend
 
 
 
+# ======================= PUT =======================
+
 
 @router.put(
     '/{id}/add-students'
@@ -241,7 +247,7 @@ async def add_new_students_to_class(id: str, payload: dict, Authorize: AuthJWT =
 
         current_students_in_class = set()
         if class_students.data[0]['students'] is not None:
-            set(class_students.data[0]['students'])
+            current_students_in_class = set(class_students.data[0]['students'])
 
         add_students = set(map(lambda id: ID.slug2uuid(id), payload['students']))
         append_students = list(add_students.union(current_students_in_class))
@@ -264,7 +270,6 @@ async def add_new_students_to_class(id: str, payload: dict, Authorize: AuthJWT =
     return { 'detail': f"{length} students successfully added to the class." }
 
 
-
 @router.put(
     '/{id}/class-info'
 )
@@ -282,7 +287,6 @@ async def update_class_info(id: str, payload: dict, Authorize: AuthJWT = Depends
         )
 
     return { 'detail': f"Class info updated!" }
-
 
 
 @router.put(
@@ -308,3 +312,36 @@ async def remove_student_from_class(id:str, payload: dict, Authorize: AuthJWT = 
 
     length = len(payload['students'])
     return {'detail': f"{length} students successfully removed."}
+
+
+
+
+# ======================= DELETE =======================
+@router.delete(
+    '/{id}/archive'
+)
+async def archive_class(id: str, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+
+    try:
+        id = ID.slug2uuid(id)
+
+        class_info = db.supabase.table('classes').select('*').eq('id', uuid.UUID(id).hex).single().execute()
+
+        for load_id in class_info.data['subject_loads']:
+            schedule = db.supabase.table('active_schedules').select('*').eq('id', load_id).single().execute()
+
+            archive_load = db.supabase.table('archived_schedules').insert(schedule.data).execute()
+            remove_load = db.supabase.table('active_schedules').delete().eq('id', load_id).execute()
+        
+        archive_class = db.supabase.table('archived_classes').insert(class_info.data).execute()
+        remove_class = db.supabase.table('classes').delete().eq('id', uuid.UUID(id).hex).execute()
+
+
+    except Exception as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+    return {'status': 200, 'detail': f"Successfully archived."}
