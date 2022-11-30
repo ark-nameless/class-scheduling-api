@@ -79,7 +79,6 @@ async def get_all_teachers_in_department(departmentId: str, Authorize: AuthJWT =
     try:
         departmentId = ID.slug2uuid(departmentId)
         teachers = db.supabase.rpc('get_department_teachers', { 'search_id': uuid.UUID(departmentId).hex }).execute()
-        print(departmentId)
         
         for entry in teachers.data: 
             data.append({
@@ -294,7 +293,6 @@ async def create_new_department(payload: CreateDepartment, Authorize: AuthJWT = 
         payload.head_id = ID.slug2uuid(payload.head_id)
         new_department = db.supabase.table('departments').insert({ **payload.dict() }).execute()
         if payload.head_id != None:
-            print('change user info')
             update_user_department = db.supabase.table('teachers').update({'department_id': new_department.data[0]['id']}).eq('user_id', payload.head_id).execute()
             update_user_role = db.supabase.table('users').update({'role': 'Department Head'}).eq('id', payload.head_id).execute()
 

@@ -160,7 +160,6 @@ async def get_teacher_profile(id: str, Authorize: AuthJWT = Depends()):
     return { 'data': data, 'request_by': user_request, 'when': datetime.utcnow() }
 
 
-
 @router.get(
     '/{id}/schedules'
 )
@@ -192,6 +191,88 @@ async def get_teacher_schedule(id: str, Authorize: AuthJWT = Depends()):
         )
     print(data)
     return { 'data': data, 'request_by': user_request, 'when': datetime.utcnow() }
+
+
+@router.get(
+    '/{id}/profile'
+)
+async def get_teacher_profile(id: str, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+
+    data = {}
+    try:
+        id = ID.slug2uuid(id)
+        profile = db.supabase.table('teachers').select('*').eq('user_id', uuid.UUID(id).hex).single().execute()
+
+        data['profile'] = profile.data
+        data['profile']['user_id'] = ID.uuid2slug(str(profile.data['user_id']))
+
+        credentials = db.supabase.table('users').select('username, email').eq('id', uuid.UUID(id).hex).single().execute()
+
+        data['credentials'] = credentials.data
+
+            
+
+    except APIError as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=e.message
+        )
+    except Exception as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+    return { 'data': data, 'status': 200 }
+
+
+@router.get(
+    '/{id}/teaching-assignment'
+)
+async def get_teacher_teaching_assignment(id: str, Authorize: AuthJWT = Depends()):
+    # Authorize.jwt_required()
+
+    data = []
+    try:
+        id = ID.slug2uuid(id)
+
+        schedules = db.supabase.table('active_schedules').select('*').eq('teacher_id', uuid.UUID(id).hex).execute()
+        class_info = db.supabase.table('classes').select('name, students').contains('subject_loads', [schedules.data[0]['id']]).single().execute()
+
+        for load in schedules.data: 
+            days = ''
+            times = ''
+            for schedule in load['schedules']:
+                days += ''.join(schedule['days']) + ' '
+                times += f"{schedule['startTime'].split(' ')[0]}-{schedule['endTime'].split(' ')[0]} "
+
+            data.append({
+                'section_id': load['section_id'],
+                'subject_id': load['subject_id'],
+                'description': load['description'],
+                'units': load['units'],
+                'hours': load['hours'],
+                'college': class_info.data['name'],
+                'class_size': len(class_info.data['students']),
+                'days': days,
+                'time': times,
+            })
+
+    except APIError as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=e.message
+        )
+    except Exception as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+    
+    return { 'data': data, 'status': 200 }
+
+
 
 # ================= POST REQUESTS =================
 
@@ -245,7 +326,7 @@ async def register_unverified_teacher(payload: NewUnverifiedTeacher, Authorize: 
 @router.put(
     '/{tokenId}',
 )
-async def verify_teacher_information(tokenId: str, payload: VerifyTeacherAccount): 
+async def verify_teacher_information(tokenId: str, payload: VerifyTeacherAccount, Authorize: AuthJWT = Depends()): 
     username = db.supabase.table('users').select('username').eq('username', payload.user.username).execute().data
     if len(username) > 0:
         raise HTTPException(
@@ -271,6 +352,75 @@ async def verify_teacher_information(tokenId: str, payload: VerifyTeacherAccount
         )
 
     return { 'data': { 'detail': 'Account Verification Successful'}, 'status': 200 }
+
+
+@router.put(
+    '/{id}/update-credentials'
+)
+async def update_teacher_credentials(id: str, payload: dict, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+
+    print(payload)
+    try:
+        id = ID.slug2uuid(id)
+
+        username = db.supabase.table('users').select('id, username').eq('username', payload['username']).execute().data
+        user = db.supabase.table('users').select('username, email, password').eq('id', uuid.UUID(id).hex).single().execute()
+        email_check = db.supabase.table('users').select('id, email').eq('email', payload['email']).execute()
+        user = user.data
+
+        
+    except APIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=e.message
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+    if len(email_check.data) > 0 and ID.uuid2slug(str(email_check.data[0]['id']) != ID.uuid2slug(str(id))): 
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User with the same email already exists"
+        )
+    if len(username) > 0 and ID.uuid2slug(str(username[0]['id']) != ID.uuid2slug(str(id))): 
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Username already exists"
+        )
+    if (not Authenticator.verify_password(payload['currentPassword'], user['password'])):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='Unable to Update Information! Incorrect Password'
+        )
+
+    data = {
+        'username': payload['username'],
+        'email': payload['email'],
+    }
+
+    try:
+        if payload['password'] is not None or payload['password'] == '':
+            data['password'] = Authenticator.hash_password((payload['password']))
+
+        user_update = db.supabase.table('users').update({**data}).eq('id', uuid.UUID(id).hex).execute()
+    except APIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=e.message
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+    return { 'status': 200, 'detail': 'Successfully Updated!'}
+
+
 
 # ================= PUT REQUESTS =================
 

@@ -24,6 +24,7 @@ async def get_class_info(id: str, Authorize: AuthJWT = Depends()):
     
     id = ID.slug2uuid(id)
     class_info = db.supabase.table('classes').select('*').eq('id', uuid.UUID(id).hex).execute()
+    department_name = db.supabase.table('departments').select('name').eq('id', class_info.data[0]['department_id']).single().execute().data['name']
     data = {
         'id': ID.uuid2slug(str(class_info.data[0]['id'])),
         'name': class_info.data[0]['name'],
@@ -31,6 +32,7 @@ async def get_class_info(id: str, Authorize: AuthJWT = Depends()):
         'semester': class_info.data[0]['semester'],
         'year': class_info.data[0]['year'],
         'section_block': class_info.data[0]['section_block'],
+        'department_name': department_name
     }
 
     return { **data }
