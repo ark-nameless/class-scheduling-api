@@ -134,7 +134,7 @@ async def get_teachers_active_subject_loads(teacherId: str, Authorize: AuthJWT =
     '/{id}',
 )
 async def get_teacher_profile(id: str, Authorize: AuthJWT = Depends()):
-    Authorize.jwt_optional()
+    Authorize.jwt_required()
     user_request = Authorize.get_jwt_subject() or "anonymous"
 
     data = {}
@@ -231,7 +231,7 @@ async def get_teacher_profile(id: str, Authorize: AuthJWT = Depends()):
     '/{id}/teaching-assignment'
 )
 async def get_teacher_teaching_assignment(id: str, Authorize: AuthJWT = Depends()):
-    # Authorize.jwt_required()
+    Authorize.jwt_required()
 
     data = []
     try:
@@ -280,7 +280,7 @@ async def get_teacher_teaching_assignment(id: str, Authorize: AuthJWT = Depends(
     '',
 )
 async def register_unverified_teacher(payload: NewUnverifiedTeacher, Authorize: AuthJWT = Depends()):
-    Authorize.jwt_optional()
+    Authorize.jwt_required()
     user_request = Authorize.get_jwt_subject() or "anonymous"
 
     email_exist = db.supabase.table('users').select('email').eq('email', payload.email).execute()
