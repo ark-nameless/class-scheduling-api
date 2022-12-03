@@ -31,7 +31,6 @@ async def get_class_info(id: str, Authorize: AuthJWT = Depends()):
         'major': class_info.data[0]['major'],
         'semester': class_info.data[0]['semester'],
         'year': class_info.data[0]['year'],
-        'section_block': class_info.data[0]['section_block'],
         'department_name': department_name
     }
 
@@ -42,13 +41,19 @@ async def get_class_info(id: str, Authorize: AuthJWT = Depends()):
     '/{id}/class-loads'
 )
 async def get_class_loads(id: str, Authorize: AuthJWT = Depends()):
-    Authorize.jwt_required()
+    # Authorize.jwt_required()
 
     id = ID.slug2uuid(id)
 
     class_loads = db.supabase.rpc('get_class_loads', {'search_id': uuid.UUID(str(id)).hex }).execute()
 
-    return { 'data': class_loads.data }
+    data = []
+    for load in class_loads.data:
+        load['id'] = ID.uuid2slug(str(load['id']))
+        load['teacher_id'] = ID.uuid2slug(str(load['teacher_id']))
+        data.append(load)
+
+    return { 'data': data }
 
 
 @router.get(
@@ -316,6 +321,56 @@ async def remove_student_from_class(id:str, payload: dict, Authorize: AuthJWT = 
     return {'detail': f"{length} students successfully removed."}
 
 
+@router.put(
+    '/{id}/update-subject-schedule'
+)
+async def update_subject_schedule(id: str, payload: dict, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+
+    try: 
+        id = ID.slug2uuid(id)
+
+        payload['teacher_id'] = uuid.UUID(str(ID.slug2uuid(payload['teacher_id']))).hex
+
+        updated = db.supabase.table('active_schedules').update({**payload}).eq('id', uuid.UUID(id).hex).execute()
+    except APIError as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=e.message
+        )
+    except Exception as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+    return { 'status': 200, 'detail': 'Updated class schedule.' }
+
+
+
+@router.put(
+    '/{id}/update-subject-info'
+)
+async def update_subject_info(id: str, payload: dict, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+
+    try: 
+        id = ID.slug2uuid(id)
+        print(id)
+
+        updated = db.supabase.table('active_schedules').update({**payload}).eq('id', uuid.UUID(id).hex).execute()
+    except APIError as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=e.message
+        )
+    except Exception as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+    return { 'status': 200, 'detail': 'Updated class schedule.' }
 
 
 # ======================= DELETE =======================

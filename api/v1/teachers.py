@@ -189,7 +189,7 @@ async def get_teacher_schedule(id: str, Authorize: AuthJWT = Depends()):
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=e
         )
-    print(data)
+
     return { 'data': data, 'request_by': user_request, 'when': datetime.utcnow() }
 
 
@@ -238,7 +238,8 @@ async def get_teacher_teaching_assignment(id: str, Authorize: AuthJWT = Depends(
         id = ID.slug2uuid(id)
 
         schedules = db.supabase.table('active_schedules').select('*').eq('teacher_id', uuid.UUID(id).hex).execute()
-        class_info = db.supabase.table('classes').select('name, students').contains('subject_loads', [schedules.data[0]['id']]).single().execute()
+        if schedules.data != []:
+            class_info = db.supabase.table('classes').select('name, students').contains('subject_loads', [schedules.data[0]['id']]).single().execute()
 
         for load in schedules.data: 
             days = ''
@@ -254,7 +255,7 @@ async def get_teacher_teaching_assignment(id: str, Authorize: AuthJWT = Depends(
                 'units': load['units'],
                 'hours': load['hours'],
                 'college': class_info.data['name'],
-                'class_size': len(class_info.data['students']),
+                'class_size': len(class_info.data['students'] or []),
                 'days': days,
                 'time': times,
             })
@@ -269,6 +270,8 @@ async def get_teacher_teaching_assignment(id: str, Authorize: AuthJWT = Depends(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+    print(data)
     
     return { 'data': data, 'status': 200 }
 
@@ -360,7 +363,6 @@ async def verify_teacher_information(tokenId: str, payload: VerifyTeacherAccount
 async def update_teacher_credentials(id: str, payload: dict, Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
 
-    print(payload)
     try:
         id = ID.slug2uuid(id)
 
@@ -407,6 +409,33 @@ async def update_teacher_credentials(id: str, payload: dict, Authorize: AuthJWT 
             data['password'] = Authenticator.hash_password((payload['password']))
 
         user_update = db.supabase.table('users').update({**data}).eq('id', uuid.UUID(id).hex).execute()
+    except APIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=e.message
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+    return { 'status': 200, 'detail': 'Successfully Updated!'}
+
+
+
+@router.put(
+    '/{id}/update-profile-info'
+)
+async def update_teacher_profile_info(id: str, payload: dict, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+
+    try:
+        id = ID.slug2uuid(id)
+
+        user_profile = db.supabase.table('teachers').update({**payload}).eq('user_id', uuid.UUID(id).hex).execute()
+
+        
     except APIError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

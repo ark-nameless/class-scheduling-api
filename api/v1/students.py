@@ -210,8 +210,6 @@ async def get_student_profile(id: str, Authorize: AuthJWT = Depends()):
 
         data['credentials'] = credentials.data
 
-            
-
     except APIError as e: 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -225,6 +223,31 @@ async def get_student_profile(id: str, Authorize: AuthJWT = Depends()):
 
     return { 'data': data, 'status': 200 }
 
+
+
+@router.put(
+    '/{id}/update-profile-info'
+)
+async def update_student_profile_info(id: str, payload: dict, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+
+    # try:
+    id = ID.slug2uuid(id)
+    user_profile = db.supabase.table('students').update({**payload}).eq('user_id', uuid.UUID(id).hex).execute()
+
+        
+    # except APIError as e:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #         detail=e.message
+    #     )
+    # except Exception as e:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #         detail=str(e)
+    #     )
+
+    return { 'status': 200, 'detail': 'Successfully Updated!'}
 
 
 
