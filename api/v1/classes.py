@@ -373,6 +373,77 @@ async def update_subject_info(id: str, payload: dict, Authorize: AuthJWT = Depen
     return { 'status': 200, 'detail': 'Updated class schedule.' }
 
 
+@router.put(
+    '/{id}/class-loads'
+)
+async def update_new_class_loads(id: str, payload: list, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    id = ID.slug2uuid(id)
+
+    try:
+        new_class_load = []
+        for load in payload: 
+            if not load['id']:
+                del load['id']
+                load['teacher_id'] = ID.slug2uuid(load['teacher_id'])
+                new_class_load.append(load)
+
+        class_info = db.supabase.table('classes').select('*').eq('id', uuid.UUID(id).hex).single().execute()
+
+        # save new class loads
+        saved_ids = class_info.data['subject_loads']
+        for load in new_class_load:
+            subject_load = db.supabase.table('active_schedules').insert({**load}).execute()
+            saved_ids.append(subject_load.data[0]['id'])
+
+        class_ = db.supabase.table('classes').update({'subject_loads': saved_ids}).eq('id', class_info.data['id']).execute()
+
+
+    except APIError as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=e.message
+        )
+    except Exception as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+    return { 'status': 200, 'detail': 'Class Loads Updated' }
+
+@router.delete(
+    '/{classId}/class-load/{id}/delete'
+)
+async def remove_class_load_from_schedule(classId: str, id: str, Authorize: AuthJWT = Depends()):
+    Authorize.jwt_required()
+    id = ID.slug2uuid(id)
+    classId = ID.slug2uuid(classId)
+
+    try:
+        class_info = db.supabase.table('classes').select('*').eq('id', uuid.UUID(classId).hex).single().execute()
+
+        saved_ids = class_info.data['subject_loads']
+        for idx, load in enumerate(class_info.data['subject_loads']):
+            if uuid.UUID(id) == uuid.UUID(load):
+                saved_ids.pop(idx)
+        print(saved_ids)
+        class_ = db.supabase.table('classes').update({'subject_loads': saved_ids}).eq('id', class_info.data['id']).execute()
+
+    except APIError as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=e.message
+        )
+    except Exception as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+    return { 'status': 200, 'detail': 'Class Deleted' }
+
+
 # ======================= DELETE =======================
 @router.delete(
     '/{id}/archive'

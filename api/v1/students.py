@@ -231,21 +231,21 @@ async def get_student_profile(id: str, Authorize: AuthJWT = Depends()):
 async def update_student_profile_info(id: str, payload: dict, Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
 
-    # try:
-    id = ID.slug2uuid(id)
-    user_profile = db.supabase.table('students').update({**payload}).eq('user_id', uuid.UUID(id).hex).execute()
+    try:
+        id = ID.slug2uuid(id)
+        user_profile = db.supabase.table('students').update({**payload}).eq('user_id', uuid.UUID(id).hex).execute()
 
         
-    # except APIError as e:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-    #         detail=e.message
-    #     )
-    # except Exception as e:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-    #         detail=str(e)
-    #     )
+    except APIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=e.message
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
     return { 'status': 200, 'detail': 'Successfully Updated!'}
 
