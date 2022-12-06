@@ -238,15 +238,15 @@ async def get_teacher_teaching_assignment(id: str, Authorize: AuthJWT = Depends(
         id = ID.slug2uuid(id)
 
         schedules = db.supabase.table('active_schedules').select('*').eq('teacher_id', uuid.UUID(id).hex).execute()
-        if schedules.data != []:
-            class_info = db.supabase.table('classes').select('name, students').contains('subject_loads', [schedules.data[0]['id']]).single().execute()
 
-        for load in schedules.data: 
+        for idx, load in enumerate(schedules.data): 
+            if schedules.data != []:
+                class_info = db.supabase.table('classes').select('name, students').contains('subject_loads', [schedules.data[idx]['id']]).single().execute()
             days = ''
             times = ''
             for schedule in load['schedules']:
                 days += ''.join(schedule['days']) + ' '
-                times += f"{schedule['startTime'].split(' ')[0]}-{schedule['endTime'].split(' ')[0]} "
+                times += f"{schedule['startTime'].split(' ')[0]}-{schedule['endTime'].split(' ')[0]}"
 
             data.append({
                 'section_id': load['section_id'],
@@ -271,7 +271,7 @@ async def get_teacher_teaching_assignment(id: str, Authorize: AuthJWT = Depends(
             detail=str(e)
         )
 
-    print(data)
+    # print(data)
     
     return { 'data': data, 'status': 200 }
 
