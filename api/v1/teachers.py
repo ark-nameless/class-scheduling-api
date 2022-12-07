@@ -246,7 +246,7 @@ async def get_teacher_teaching_assignment(id: str, Authorize: AuthJWT = Depends(
             times = ''
             for schedule in load['schedules']:
                 days += ''.join(schedule['days']) + ' '
-                times += f"{schedule['startTime'].split(' ')[0]}-{schedule['endTime'].split(' ')[0]}"
+                times += f"{schedule['startTime'].split(' ')[0]}-{schedule['endTime'].split(' ')[0]} "
 
             data.append({
                 'section_id': load['section_id'],
@@ -271,7 +271,6 @@ async def get_teacher_teaching_assignment(id: str, Authorize: AuthJWT = Depends(
             detail=str(e)
         )
 
-    # print(data)
     
     return { 'data': data, 'status': 200 }
 

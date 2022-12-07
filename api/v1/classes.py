@@ -238,6 +238,34 @@ async def create_new_schedule_request(payload: dict, Authorize: AuthJWT = Depend
 
 
 
+@router.get(
+    '/all-subject-loads'
+)
+async def get_all_active_schedules(Authorize: AuthJWT = Depends()):
+    data = []
+    try :
+        schedules = db.supabase.table('active_schedules').select('*').execute()
+
+        for load in schedules.data:
+            load['id'] = ID.uuid2slug(str(load['id']))
+            load['teacher_id'] = ID.uuid2slug(str(load['teacher_id']))
+
+            data.append(load)
+
+    except APIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=e.message
+        )
+    except Exception as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+    return { 'data': data, 'status': 200 }
+
+
 
 # ======================= PUT =======================
 

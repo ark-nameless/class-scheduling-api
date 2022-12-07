@@ -43,6 +43,36 @@ async def get_all_departments(Authorize: AuthJWT = Depends()):
     return { 'data': data, 'when': datetime.utcnow(), 'request_by': user_request }
 
 
+
+@router.get(
+    '/{id}'
+)
+async def get_department_info(id: str, Authorize: AuthJWT = Depends()):
+    id = ID.slug2uuid(id)
+
+    try:
+        class_info = db.supabase.table('departments').select('*').eq('id', uuid.UUID(id).hex).single().execute()
+
+        data = class_info.data
+
+        data['id'] = ID.uuid2slug(str(data['id']))
+        data['head_id'] = ID.uuid2slug(str(data['head_id']))
+
+    except APIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=e.message
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=e
+        )
+
+    return { 'data': data, 'status': 200 }
+
+
+
 @router.get(
     '/heads',
 )
@@ -313,32 +343,41 @@ async def create_new_department(payload: CreateDepartment, Authorize: AuthJWT = 
 async def update_department(departmentId: str, payload: UpdateDepartment, Authorize: AuthJWT = Depends()): 
     Authorize.jwt_required()
     user_request = Authorize.get_jwt_subject() or "anonymous"
+    departmentId = ID.slug2uuid(departmentId)
 
     try: 
         if payload.abbrev != None:
-            dept_abbrev = db.supabase.table('departments').select('abbrev').eq('abbrev', payload.abbrev).execute()
-            if dept_abbrev.data: 
+            dept_abbrev = db.supabase.table('departments').select('*').eq('abbrev', payload.abbrev).execute()
+            if dept_abbrev.data and uuid.UUID(dept_abbrev.data[0]['id']) != uuid.UUID(departmentId): 
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Department abbreviation already exists"
                 )
         if payload.section_id != None:
-            section_id = db.supabase.table('departments').select('section_id').eq('section_id', payload.section_id).execute()
-            if section_id.data:
+            section_id = db.supabase.table('departments').select('*').eq('section_id', payload.section_id).execute()
+            if section_id.data and uuid.UUID(section_id.data[0]['id']) != uuid.UUID(departmentId):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Department section id already exists."
                 )
 
-        departmentId = ID.slug2uuid(departmentId)
-        department = db.supabase.table('departments').update({ **payload.dict() }).eq('id', uuid.UUID(departmentId).hex).execute()
+        dept_info = db.supabase.table('departments').select('*').eq('id', uuid.UUID(departmentId)).single().execute()
+
+        if (payload.head_id != None and payload.head_id != ''):
+            payload.head_id = ID.slug2uuid(payload.head_id)
+            update_department_teacher = db.supabase.table('users').update({'role': 'Teacher'}).eq('id', dept_info.data['head_id']).execute()
+            set_new_dept_head = db.supabase.table('departments').update({'head_id': uuid.UUID(payload.head_id).hex}).eq('id', uuid.UUID(departmentId).hex).execute()
+            update_new_dept_head_teacher_info = db.supabase.table('teachers').update({'department_id': uuid.UUID(departmentId).hex}).eq('user_id', uuid.UUID(payload.head_id).hex).execute()
+            update_new_dept_head_role = db.supabase.table('users').update({'role': 'Department Head'}).eq('id', uuid.UUID(payload.head_id).hex).execute()
+
+        department = db.supabase.table('departments').update({ 'abbrev': payload.abbrev, 'section_id': payload.section_id, 'name': payload.name }).eq('id', uuid.UUID(departmentId).hex).execute()
     except APIError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail= e.message
         )
 
-    return { **department.dict(), 'when': datetime.utcnow(), 'request_by': user_request }
+    return { **department.dict(), 'when': datetime.utcnow(), 'request_by': user_request, 'detail': "Department successfully updated." }
 
 
 # ================= DELETE REQUESTS =================
