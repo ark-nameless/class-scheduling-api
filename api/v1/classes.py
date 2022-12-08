@@ -239,6 +239,44 @@ async def create_new_schedule_request(payload: dict, Authorize: AuthJWT = Depend
 
 
 
+@router.get(
+    '/all-subject-loads'
+)
+async def get_all_active_schedules(Authorize: AuthJWT = Depends()):
+    data = []
+    try :
+        schedules = db.supabase.table('active_schedules').select('*').execute()
+
+        for load in schedules.data:
+            load['id'] = ID.uuid2slug(str(load['id']))
+            load['teacher_id'] = ID.uuid2slug(str(load['teacher_id']))
+
+            data.append(load)
+        
+        response_schedules = db.supabase.table('response_schedules').select('*').execute()
+
+        for load in response_schedules.data:
+            load['id'] = ID.uuid2slug(str(load['id']))
+            load['teacher_id'] = ID.uuid2slug(str(load['teacher_id']))
+
+            data.append(load)
+
+    except APIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=e.message
+        )
+    except Exception as e: 
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+    return { 'data': data, 'status': 200 }
+
+
+
+
 # ======================= PUT =======================
 
 
@@ -376,13 +414,36 @@ async def update_subject_info(id: str, payload: dict, Authorize: AuthJWT = Depen
 @router.put(
     '/{id}/class-loads'
 )
-async def update_new_class_loads(id: str, payload: list, Authorize: AuthJWT = Depends()):
+async def update_new_class_loads(id: str, payload: dict, Authorize: AuthJWT = Depends()):
     Authorize.jwt_required()
     id = ID.slug2uuid(id)
 
+
+    saved_loads = []
+    for load in payload['response_loads']:
+        try: 
+            load_id = uuid.UUID(ID.slug2uuid(load['id'])).hex
+            removed = db.supabase.table('response_schedules').delete().eq('id', load_id).execute()
+            load['teacher_id'] = uuid.UUID(ID.slug2uuid(load['teacher_id'])).hex
+            del load['id']
+            del load['teacher_name']
+            subject = db.supabase.table('active_schedules').insert(load).execute()
+            saved_loads.append(subject.data[0]['id'])
+
+        except APIError as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=e.message
+            )
+        except Exception as e: 
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=str(e)
+            )
+
     try:
         new_class_load = []
-        for load in payload: 
+        for load in payload['subject_loads']: 
             if not load['id']:
                 del load['id']
                 load['teacher_id'] = ID.slug2uuid(load['teacher_id'])
@@ -395,6 +456,7 @@ async def update_new_class_loads(id: str, payload: list, Authorize: AuthJWT = De
         for load in new_class_load:
             subject_load = db.supabase.table('active_schedules').insert({**load}).execute()
             saved_ids.append(subject_load.data[0]['id'])
+        saved_ids += saved_loads
 
         class_ = db.supabase.table('classes').update({'subject_loads': saved_ids}).eq('id', class_info.data['id']).execute()
 
@@ -429,6 +491,7 @@ async def remove_class_load_from_schedule(classId: str, id: str, Authorize: Auth
                 saved_ids.pop(idx)
         print(saved_ids)
         class_ = db.supabase.table('classes').update({'subject_loads': saved_ids}).eq('id', class_info.data['id']).execute()
+        delete_schedule = db.supabase.table('active_schedules').delete().eq('id', id).execute()
 
     except APIError as e: 
         raise HTTPException(

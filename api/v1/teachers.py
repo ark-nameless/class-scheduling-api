@@ -236,12 +236,13 @@ async def get_teacher_teaching_assignment(id: str, Authorize: AuthJWT = Depends(
     data = []
     try:
         id = ID.slug2uuid(id)
-
         schedules = db.supabase.table('active_schedules').select('*').eq('teacher_id', uuid.UUID(id).hex).execute()
 
         for idx, load in enumerate(schedules.data): 
             if schedules.data != []:
-                class_info = db.supabase.table('classes').select('name, students').contains('subject_loads', [schedules.data[idx]['id']]).single().execute()
+                class_info = db.supabase.table('classes').select('name, students').contains('subject_loads', [schedules.data[idx]['id']]).execute()
+                if class_info.data == []: continue
+
             days = ''
             times = ''
             for schedule in load['schedules']:
@@ -254,8 +255,8 @@ async def get_teacher_teaching_assignment(id: str, Authorize: AuthJWT = Depends(
                 'description': load['description'],
                 'units': load['units'],
                 'hours': load['hours'],
-                'college': class_info.data['name'],
-                'class_size': len(class_info.data['students'] or []),
+                'college': class_info.data[0]['name'],
+                'class_size': len(class_info.data[0]['students']),
                 'days': days,
                 'time': times,
             })
