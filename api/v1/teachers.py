@@ -240,6 +240,7 @@ async def get_teacher_teaching_assignment(id: str, Authorize: AuthJWT = Depends(
 
         for idx, load in enumerate(schedules.data): 
             if schedules.data != []:
+                print(schedules.data)
                 class_info = db.supabase.table('classes').select('name, students').contains('subject_loads', [schedules.data[idx]['id']]).execute()
                 if class_info.data == []: continue
 
@@ -249,6 +250,7 @@ async def get_teacher_teaching_assignment(id: str, Authorize: AuthJWT = Depends(
                 days += ''.join(schedule['days']) + ' '
                 times += f"{schedule['startTime'].split(' ')[0]}-{schedule['endTime'].split(' ')[0]} "
 
+            # TODO: Fix class student when no students is enrolled.
             data.append({
                 'section_id': load['section_id'],
                 'subject_id': load['subject_id'],
@@ -256,7 +258,7 @@ async def get_teacher_teaching_assignment(id: str, Authorize: AuthJWT = Depends(
                 'units': load['units'],
                 'hours': load['hours'],
                 'college': class_info.data[0]['name'],
-                'class_size': len(class_info.data[0]['students']),
+                'class_size': len(class_info.data[0]['students'] or []),
                 'days': days,
                 'time': times,
             })
