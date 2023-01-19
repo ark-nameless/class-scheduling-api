@@ -15,11 +15,19 @@ from core.mailer import Mailer
 router = APIRouter() 
 
 
-@router.get("/")
+@router.get("")
 async def get_all_used_room(Authorize = Depends(AuthJWT)):
     data = db.supabase.table('active_schedules').select('schedules').execute()
 
-    return {'data': data}
+    rooms = (set())
+    for i in data.data:
+        for sched in i['schedules']:
+            if sched['location'] != '':
+                rooms.add(sched['location'])
+
+
+
+    return rooms
 
 
 @router.get("/schedules/{room_name}")
